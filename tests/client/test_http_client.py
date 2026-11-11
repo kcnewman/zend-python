@@ -109,8 +109,8 @@ class TestHttpClientRequest:
         res = _client(httpx.MockTransport(handler)).request("GET", "/messages")
         assert res.data is None
         assert isinstance(res.error, ApplicationError)
-        assert res.error.name == "application_error"
-        assert "boom" in str(res.error)
+        assert res.error.name == "transport_error"
+        assert "boom" not in str(res.error)
 
     def test_builds_query_ignoring_undefined(self) -> None:
         captured: list[str] = []

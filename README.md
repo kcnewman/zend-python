@@ -235,11 +235,60 @@ Invalid method arguments are programmer errors and raise Pydantic's
 `ValidationError`. Passing both an options model and keyword arguments raises
 `TypeError`.
 
-`ZendError` subclasses include `APIError`, `BadRequestError`, `AuthenticationError`, `RateLimitError`, `ServerError`, `ZendTimeoutError`, and `ApplicationError`. Attributes:
+`ZendError` subclasses include `APIError`, `BadRequestError`, `AuthenticationError`,
+`PermissionDeniedError`, `NotFoundError`, `RateLimitError`, `ServerError`,
+`ZendTimeoutError`, and `ApplicationError`. Attributes:
 
 - `name` — e.g. `"api_error"`, `"timeout"`, `"application_error"`
 - `status_code` — HTTP status when available
 - `code` — provider error code when available
+
+Transport and success-response interpretation failures have distinct types:
+
+```python
+from zend import ResponseValidationError, TransportError, ZendTimeoutError
+
+result = zend.emails.send(
+    from_="you@example.com",
+    to="user@example.com",
+    subject="Hello",
+    html="<p>Hello!</p>",
+)
+error = result.error
+if isinstance(error, ResponseValidationError):
+    # A 2xx response arrived, but JSON decoding or schema validation failed.
+    print("Unusable success response", error.status_code)
+elif isinstance(error, (TransportError, ZendTimeoutError)):
+    # No usable HTTP response was received; status_code is None.
+    print("No usable response")
+elif error is not None:
+    # Existing HTTP rejection types and provider error details still apply.
+    print(error.name, error.status_code)
+else:
+    email = result.unwrap()
+```
+
+`TransportError` and `ResponseValidationError` subclass `ApplicationError`, so
+existing `isinstance(error, ApplicationError)` checks continue to work.
+`ZendTimeoutError` retains its separate inheritance from `ZendError` and its
+existing timeout message. The new errors use stable messages rather than raw
+transport or validation details; callers should branch on types and attributes.
+`ResponseValidationError.status_code` retains the received 2xx status.
+Nonempty malformed JSON is a failure even for untyped or nullable responses;
+empty bodies still succeed when the expected response type permits `None`.
+
+Neither a transport failure (including a timeout) nor an unusable success response
+proves whether the provider performed the operation. These categories do not
+establish acceptance or delivery. Applications remain responsible for retry,
+reconciliation, and duplicate-send policies. The SDK adds no automatic retries
+or retry-safety flag; provider-side idempotency is outside this behavior.
+
+No provider request/correlation ID header convention could be verified in Zend's
+[error documentation](https://www.tryzend.com/docs/platform/errors) or
+[SDK documentation](https://www.tryzend.com/docs/sdks/node). The SDK therefore
+does not guess a header or expose a request ID. The new diagnostics retain no
+complete headers, bodies, credentials, recipient details, request URLs, or raw
+exceptions.
 
 ## Full example
 

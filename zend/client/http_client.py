@@ -5,7 +5,12 @@ from typing import Any, TypeVar
 import httpx
 from pydantic import BaseModel, TypeAdapter
 
-from zend.client.error import ApplicationError, ZendError, ZendTimeoutError
+from zend.client.error import (
+    ResponseValidationError,
+    TransportError,
+    ZendError,
+    ZendTimeoutError,
+)
 from zend.common.normalize import normalize_response
 from zend.common.types import ZendFailure, ZendResponse, ZendSuccess
 from zend.version import VERSION
@@ -54,23 +59,23 @@ def _handle_response(
     response: httpx.Response,
     cast_to: type[T] | TypeAdapter[T] | None,
 ) -> ZendResponse[T]:
-    json_body = _parse_json(response)
-
     if not 200 <= response.status_code < 300:
         return ZendFailure(
             error=ZendError.from_http(
                 response.status_code,
-                json_body,
+                _parse_json(response),
                 response.text,
                 response.reason_phrase,
             )
         )
 
-    normalized = normalize_response(json_body)
     try:
-        data = _cast(normalized, cast_to)
-    except (TypeError, ValueError) as exc:
-        return ZendFailure(error=ApplicationError(str(exc)))
+        # Empty responses remain supported when the expected type permits None.
+        # Nonempty bodies must be JSON, even for untyped/nullable responses.
+        json_body = response.json() if response.content else None
+        data = _cast(normalize_response(json_body), cast_to)
+    except (TypeError, ValueError):
+        return ZendFailure(error=ResponseValidationError(status_code=response.status_code))
     return ZendSuccess(data=data)
 
 
@@ -126,8 +131,8 @@ class HttpClient:
             return ZendFailure(
                 error=ZendTimeoutError(f"Request timed out after {int(self._timeout * 1000)}ms"),
             )
-        except httpx.HTTPError as exc:
-            return ZendFailure(error=ApplicationError(str(exc)))
+        except httpx.HTTPError:
+            return ZendFailure(error=TransportError())
 
         return _handle_response(response, cast_to)
 
@@ -184,7 +189,7 @@ class AsyncHttpClient:
             return ZendFailure(
                 error=ZendTimeoutError(f"Request timed out after {int(self._timeout * 1000)}ms"),
             )
-        except httpx.HTTPError as exc:
-            return ZendFailure(error=ApplicationError(str(exc)))
+        except httpx.HTTPError:
+            return ZendFailure(error=TransportError())
 
         return _handle_response(response, cast_to)

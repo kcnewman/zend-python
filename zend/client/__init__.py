@@ -8,7 +8,9 @@ from zend.client.error import (
     NotFoundError,
     PermissionDeniedError,
     RateLimitError,
+    ResponseValidationError,
     ServerError,
+    TransportError,
     ZendError,
     ZendTimeoutError,
 )
@@ -24,7 +26,9 @@ __all__ = [
     "NotFoundError",
     "PermissionDeniedError",
     "RateLimitError",
+    "ResponseValidationError",
     "ServerError",
+    "TransportError",
     "ZendError",
     "ZendTimeoutError",
 ]

@@ -169,3 +169,28 @@ class ApplicationError(ZendError):
             status_code=status_code,
             code=code,
         )
+
+
+class TransportError(ApplicationError):
+    """No usable HTTP response was received; submission outcome is unknown."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Request failed before a usable HTTP response was received",
+            name="transport_error",
+        )
+
+
+class ResponseValidationError(ApplicationError):
+    """An HTTP success response could not be decoded or validated.
+
+    The status records the response received, not acceptance or delivery.
+    Raw response data and validation details are intentionally omitted.
+    """
+
+    def __init__(self, *, status_code: int) -> None:
+        super().__init__(
+            "HTTP success response could not be decoded or validated",
+            name="response_validation_error",
+            status_code=status_code,
+        )
