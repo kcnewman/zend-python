@@ -39,12 +39,12 @@ def asynchronous(request) -> bool:
 
 
 async def request_with(asynchronous: bool, handler, cast_to: Any = Email):
-    kwargs = dict(
-        api_key="secret-key",
-        base_url="https://private.test",
-        timeout=5.0,
-        transport=httpx.MockTransport(handler),
-    )
+    kwargs = {
+        "api_key": "secret-key",
+        "base_url": "https://private.test",
+        "timeout": 5.0,
+        "transport": httpx.MockTransport(handler),
+    }
     if asynchronous:
         client = AsyncHttpClient(**kwargs)
         try:
@@ -211,15 +211,14 @@ async def test_request_validation_still_raises_before_submission(asynchronous) -
     def handler(_):
         pytest.fail("Invalid arguments must not reach HTTP submission")
 
-    kwargs = dict(api_key="k", transport=httpx.MockTransport(handler))
+    kwargs = {"api_key": "k", "transport": httpx.MockTransport(handler)}
     if asynchronous:
         async with AsyncZend(**kwargs) as client:
             with pytest.raises(ValidationError):
                 await client.emails.send(to="recipient@example.com")
     else:
-        with Zend(**kwargs) as client:
-            with pytest.raises(ValidationError):
-                client.emails.send(to="recipient@example.com")
+        with Zend(**kwargs) as client, pytest.raises(ValidationError):
+            client.emails.send(to="recipient@example.com")
 
 
 def test_public_exports() -> None:
